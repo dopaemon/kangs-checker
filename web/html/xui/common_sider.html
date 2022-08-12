@@ -4,37 +4,29 @@
         <div class="sidebar-brand-icon rotate-n-15">
            <i class="fas fa-laugh-wink"></i>
         </div>
-      <div class="sidebar-brand-text mx-3">X-UI <sup>Unofficial</sup></div>
+      <div class="sidebar-brand-text mx-3">X-UI 魔改优化版</div>
     </a>
 </div>
 <a-menu-item key="{{ .base_path }}xui/">
     <a-icon type="dashboard"></a-icon>
-    <span class="sidebar-brand-text mx-3">Dashboard</span>
+    <span class="sidebar-brand-text mx-3">控制面板</span>
 </a-menu-item>
 <a-menu-item key="{{ .base_path }}xui/inbounds">
     <a-icon type="laptop"></a-icon>
-    <span>Server Chính</span>
+    <span>入站列表</span>
 </a-menu-item>
 <!-- <a-menu-item key="{{ .base_path }}xui/clients">
     <a-icon type="laptop"></a-icon>
-    <span>Server Khác</span>
+    <span>客户端</span>
 </a-menu-item> -->
 <a-sub-menu>
     <template slot="title">
         <a-icon type="link"></a-icon>
-        <span>Liên Lạc</span>
+        <span>其他</span>
     </template>
     <a-menu-item key="https://github.com/dopaemon">
         <a-icon type="github"></a-icon>
-        <span>dopaemon</span>
-    </a-menu-item>
-    <a-menu-item key="https://fb.me/KernelPanix">
-        <a-icon type="facebook"></a-icon>
-        <span>Trần Nguyễn Tuấn Anh</span>
-    </a-menu-item>
-    <a-menu-item key="https://t.me/KernelPanix">
-        <a-icon type="telegram"></a-icon>
-        <span>KernelPanix</span>
+        <span>GitHub 项目</span>
     </a-menu-item>
 </a-sub-menu>
 {{end}}

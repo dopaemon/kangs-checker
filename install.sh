@@ -1,170 +1,240 @@
 #!/bin/bash
 
-red='\033[0;31m'
-green='\033[0;32m'
-yellow='\033[0;33m'
-plain='\033[0m'
+export LANG=en_US.UTF-8
+
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+PLAIN="\033[0m"
+
+red() {
+    echo -e "\033[31m\033[01m$1\033[0m"
+}
+
+green() {
+    echo -e "\033[32m\033[01m$1\033[0m"
+}
+
+yellow() {
+    echo -e "\033[33m\033[01m$1\033[0m"
+}
+
+REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "'amazon linux'" "fedora", "alpine")
+RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS" "Fedora" "Alpine")
+PACKAGE_UPDATE=("apt-get update" "apt-get update" "yum -y update" "yum -y update" "yum -y update" "apk update -f")
+PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install" "yum -y install" "apk add -f")
+PACKAGE_REMOVE=("apt -y remove" "apt -y remove" "yum -y remove" "yum -y remove" "yum -y remove" "apk del -f")
+PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "yum -y autoremove" "yum -y autoremove" "apk del -f")
+
+[[ $EUID -ne 0 ]] && red "请在root用户下运行脚本" && exit 1
+
+CMD=("$(grep -i pretty_name /etc/os-release 2>/dev/null | cut -d \" -f2)" "$(hostnamectl 2>/dev/null | grep -i system | cut -d : -f2)" "$(lsb_release -sd 2>/dev/null)" "$(grep -i description /etc/lsb-release 2>/dev/null | cut -d \" -f2)" "$(grep . /etc/redhat-release 2>/dev/null)" "$(grep . /etc/issue 2>/dev/null | cut -d \\ -f1 | sed '/^[ ]*$/d')")
+
+for i in "${CMD[@]}"; do
+    SYS="$i" && [[ -n $SYS ]] && break
+done
+
+for ((int = 0; int < ${#REGEX[@]}; int++)); do
+    [[ $(echo "$SYS" | tr '[:upper:]' '[:lower:]') =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && [[ -n $SYSTEM ]] && break
+done
+
+[[ -z $SYSTEM ]] && red "不支持当前VPS系统，请使用主流的操作系统" && exit 1
 
 cur_dir=$(pwd)
+os_version=$(grep -i version_id /etc/os-release | cut -d \" -f2 | cut -d . -f1)
 
-# check root
-[[ $EUID -ne 0 ]] && echo -e "${red}Lỗi：${plain} Bạn cần chạy tập lệnh này dưới user root ( không phải sudo ) ！\n" && exit 1
+[[ $SYSTEM == "CentOS" && ${os_version} -lt 7 ]] && echo -e "请使用 CentOS 7 或更高版本的系统！" && exit 1
+[[ $SYSTEM == "Fedora" && ${os_version} -lt 29 ]] && echo -e "请使用 Fedora 29 或更高版本的系统！" && exit 1
+[[ $SYSTEM == "Ubuntu" && ${os_version} -lt 16 ]] && echo -e "请使用 Ubuntu 16 或更高版本的系统！" && exit 1
+[[ $SYSTEM == "Debian" && ${os_version} -lt 9 ]] && echo -e "请使用 Debian 9 或更高版本的系统！" && exit 1
 
-# check os
-if [[ -f /etc/redhat-release ]]; then
-    release="centos"
-elif cat /etc/issue | grep -Eqi "debian"; then
-    release="debian"
-elif cat /etc/issue | grep -Eqi "armbian"; then
-    release="armbian"
-elif cat /etc/issue | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /etc/issue | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-elif cat /proc/version | grep -Eqi "debian"; then
-    release="debian"
-elif cat /proc/version | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /proc/version | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-else
-    echo -e "${red}Phiên bản Linux bạn đang dùng không thể xác định！${plain}\n" && exit 1
-fi
-
-arch=$(arch)
-
-if [[ $arch == "x86_64" || $arch == "x64" || $arch == "amd64" ]]; then
-    arch="amd64"
-elif [[ $arch == "x86" ]]; then
-    arch="x86"
-elif [[ $arch == "aarch64" || $arch == "arm64" ]]; then
-    arch="arm64"
-elif [[ $arch == "s390x" ]]; then
-    arch="s390x"
-elif [[ $arch == "riscv64" ]]; then
-    arch="riscv64"
-else
-    arch="amd64"
-    echo -e "${red}Không thể xác định cấu trúc CPU, thử dùng Kiến Trúc amd64 ${arch}${plain}"
-fi
-
-echo "Kiến Trúc CPU: ${arch}"
-
-os_version=""
-
-# os version
-if [[ -f /etc/os-release ]]; then
-    os_version=$(awk -F'[= ."]' '/VERSION_ID/{print $3}' /etc/os-release)
-fi
-if [[ -z "$os_version" && -f /etc/lsb-release ]]; then
-    os_version=$(awk -F'[= ."]+' '/DISTRIB_RELEASE/{print $2}' /etc/lsb-release)
-fi
-
-if [[ x"${release}" == x"centos" ]]; then
-    if [[ ${os_version} -le 6 ]]; then
-        echo -e "${red}Bạn dùng dùng phiên bản CentOS 7 hoặc mới hơn！${plain}\n" && exit 1
-    fi
-elif [[ x"${release}" == x"ubuntu" ]]; then
-    if [[ ${os_version} -lt 16 ]]; then
-        echo -e "${red}Bạn dùng dùng phiên bản Ubuntu 16.04 hoặc mới hơn！${plain}\n" && exit 1
-    fi
-elif [[ x"${release}" == x"debian" ]]; then
-    if [[ ${os_version} -lt 8 ]]; then
-        echo -e "${red}Bạn dùng dùng phiên bản Debian 8 hoặc mới hơn！${plain}\n" && exit 1
-    fi
-fi
-
-install_base() {
-    if [[ x"${release}" == x"centos" ]]; then
-        yum install wget curl tar -y
-    else
-        apt install wget curl tar -y
-    fi
+archAffix(){
+    case "$(uname -m)" in
+        x86_64 | x64 | amd64 ) echo 'amd64' ;;
+        armv8 | arm64 | aarch64 ) echo 'arm64' ;;
+        s390x ) echo 's390x' ;;
+        * ) red "不支持的CPU架构! " && rm -f install.sh && exit 1 ;;
+    esac
 }
 
-#This function will be called when user installed x-ui out of sercurity
-config_after_install() {
-    echo -e "${yellow}Vì lí do bảo mật, bạn nên đổi mật khẩu và tài khoản sau khi thiết lập xong ( hoặc cả port nếu bạn muốn )${plain}"
-    read -p "Xác nhận cài đặt hoàn tất ？[y/n]": config_confirm
-    if [[ x"${config_confirm}" == x"y" || x"${config_confirm}" == x"Y" ]]; then
-    	read -p "Tài khoản: " config_account
-    	echo -e "${yellow}Tên tài khoản bạn đặt là: ${config_account}${plain}"
-    	read -p "Mật khẩu:" config_password
-    	echo -e "${yellow}Mật khẩu của bạn đặt là: ${config_password}${plain}"
-    	read -p "Nhập Port:" config_port
-    	echo -e "${yellow}Port bạn sử dụng là: ${config_port}${plain}"
-        echo -e "${yellow}Xác nhận cài đặt${plain}"
-        /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password}
-        echo -e "${yellow}Hoàn tất đặt mật khẩu${plain}"
-        /usr/local/x-ui/x-ui setting -port ${config_port}
-        echo -e "\n${yellow}Hoàn tất đặt Port${plain}"
-    else
-        echo -e "${red}Đã hủy cài đặt: Vui lòng cài đặt X-UI lại hoặc gỡ cài đặt mặc định, lý do bảo mật.${plain}"
-    fi
+info_bar(){
+    clear
+    echo "#############################################################"
+    echo -e "#                         ${RED}x-ui 面板${PLAIN}                         #"
+    echo -e "# ${GREEN}作者${PLAIN}: taffychan                                           #"
+    echo -e "# ${GREEN}GitHub${PLAIN}: https://github.com/taffychan                      #"
+    echo "#############################################################"
+    echo ""
+    echo -e "操作系统: ${GREEN} ${CMD} ${PLAIN}"
+    echo ""
+    sleep 2
 }
 
-install_x-ui() {
-    systemctl stop x-ui
-    cd /usr/local/
+check_status(){
+    yellow "正在检查VPS的IP配置环境, 请稍等..." && sleep 1
+    WgcfIPv4Status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
+    WgcfIPv6Status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
+    if [[ $WgcfIPv4Status =~ "on"|"plus" ]] || [[ $WgcfIPv6Status =~ "on"|"plus" ]]; then
+        wg-quick down wgcf >/dev/null 2>&1
+        v6=$(curl -s6m8 https://ip.gs -k)
+        v4=$(curl -s4m8 https://ip.gs -k)
+        wg-quick up wgcf >/dev/null 2>&1
+    else
+        v6=$(curl -s6m8 https://ip.gs -k)
+        v4=$(curl -s4m8 https://ip.gs -k)
+        if [[ -z $v4 && -n $v6 ]]; then
+            yellow "检测到为纯IPv6 VPS, 已自动添加DNS64解析服务器"
+            echo -e "nameserver 2a01:4f8:c2c:123f::1" > /etc/resolv.conf
+        fi
+    fi
+    sleep 1
+}
 
+install_base(){
+    if [[ ! $SYSTEM == "CentOS" ]]; then
+        ${PACKAGE_UPDATE[int]}
+    fi
+    if [[ -z $(type -P curl) ]]; then
+        yellow "检测curl未安装，正在安装中..."
+        ${PACKAGE_INSTALL[int]} curl
+    fi
+    if [[ -z $(type -P tar) ]]; then
+        yellow "检测tar未安装，正在安装中..."
+        ${PACKAGE_INSTALL[int]} tar
+    fi   
+    check_status
+}
+
+download_xui(){
+    if [[ -e /usr/local/x-ui/ ]]; then
+        rm -rf /usr/local/x-ui/
+    fi
+    
     if [ $# == 0 ]; then
-        last_version=$(curl -Ls "https://api.github.com/repos/dopaemon/x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        if [[ ! -n "$last_version" ]]; then
-            echo -e "${red}Không thể xác định phiên bản X-UI, vui lòng kiểm tra github release hoặc API Github đã bị đổi${plain}"
+        last_version=$(curl -Ls "https://api.github.com/repos/taffychan/x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') || last_version=$(curl -sm8 https://raw.githubusercontents.com/taffychan/x-ui/main/config/version >/dev/null 2>&1)
+        if [[ -z "$last_version" ]]; then
+            red "检测 x-ui 版本失败，请确保你的服务器能够连接 Github API"
+            rm -f install.sh
             exit 1
         fi
-        echo -e "Đã xác định bản Latest của X-UI：${last_version}，Bắt đầu cài đặt"
-        wget -N --no-check-certificate -O /usr/local/x-ui-linux-${arch}.tar.gz https://github.com/dopaemon/x-ui/releases/download/${last_version}/x-ui-linux-${arch}.tar.gz
+        yellow "检测到 x-ui 最新版本：${last_version}，开始安装"
+        wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz https://github.com/taffychan/x-ui/releases/download/${last_version}/x-ui-linux-$(archAffix).tar.gz
         if [[ $? -ne 0 ]]; then
-            echo -e "${red}Không thể tải xuống X-UI, kiểm tra bộ nhớ, hoặc Internet${plain}"
+            red "下载 x-ui 失败，请确保你的服务器能够连接并下载 Github 的文件"
+            rm -f install.sh
             exit 1
         fi
     else
         last_version=$1
-        url="https://github.com/dopaemon/x-ui/releases/download/${last_version}/x-ui-linux-${arch}.tar.gz"
-        echo -e "Bắt đầu cài đặt x-ui v$1"
-        wget -N --no-check-certificate -O /usr/local/x-ui-linux-${arch}.tar.gz ${url}
+        url="https://github.com/taffychan/x-ui/releases/download/${last_version}/x-ui-linux-$(archAffix).tar.gz"
+        yellow "开始安装 x-ui $1"
+        wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz ${url}
         if [[ $? -ne 0 ]]; then
-            echo -e "${red}Không thể tải x-ui v$1，Đảm bảo rằng phiên bản này tồn tại${plain}"
+            red "下载 x-ui v$1 失败，请确保此版本存在"
+            rm -f install.sh
             exit 1
         fi
     fi
-
-    if [[ -e /usr/local/x-ui/ ]]; then
-        rm /usr/local/x-ui/ -rf
-    fi
-
-    tar zxvf x-ui-linux-${arch}.tar.gz
-    rm x-ui-linux-${arch}.tar.gz -f
+    
+    cd /usr/local/
+    tar zxvf x-ui-linux-$(archAffix).tar.gz
+    rm -f x-ui-linux-$(archAffix).tar.gz
+    
     cd x-ui
-    chmod +x x-ui bin/xray-linux-${arch}
+    chmod +x x-ui bin/xray-linux-$(archAffix)
     cp -f x-ui.service /etc/systemd/system/
-    wget --no-check-certificate -O /usr/bin/x-ui https://raw.githubusercontent.com/dopaemon/x-ui/main/x-ui.sh
+    
+    wget -N --no-check-certificate https://raw.githubusercontent.com/taffychan/x-ui/main/x-ui.sh -O /usr/bin/x-ui
     chmod +x /usr/local/x-ui/x-ui.sh
     chmod +x /usr/bin/x-ui
-    config_after_install
-    systemctl daemon-reload
-    systemctl enable x-ui
-    systemctl start x-ui
-    echo -e "${green}x-ui v${last_version}${plain} Quá trình cài đặt hoàn tất, bảng điều khiển được khởi chạy，"
-    echo -e ""
-    echo -e "x-ui Cách sử dụng tập lệnh quản lý: "
-    echo -e "----------------------------------------------"
-    echo -e "x-ui              - Hiển thị menu quản lý (nhiều chức năng hơn)"
-    echo -e "x-ui start        - Khởi động bảng điều khiển x-ui"
-    echo -e "x-ui stop         - dừng bảng điều khiển x-ui"
-    echo -e "x-ui restart      - khởi động lại bảng điều khiển x-ui"
-    echo -e "x-ui status       - Xem trạng thái x-ui"
-    echo -e "x-ui enable       - Đặt x-ui để bắt đầu tự động khi khởi động"
-    echo -e "x-ui disable      - Hủy tự động khởi động x-ui boot"
-    echo -e "x-ui log          - Xem nhật ký x-ui"
-    echo -e "x-ui v2-ui        - Di chuyển dữ liệu tài khoản v2-ui của máy này sang x-ui"
-    echo -e "x-ui update       - Cập nhật bảng điều khiển x-ui"
-    echo -e "x-ui install      - cài đặt bảng điều khiển x-ui"
-    echo -e "x-ui uninstall    - Gỡ cài đặt bảng điều khiển x-ui"
-    echo -e "----------------------------------------------"
 }
 
-echo -e "${green}bắt đầu cài đặt${plain}"
-install_base
-install_x-ui $1
+panel_config() {
+    yellow "出于安全性考虑，安装/更新完成后需要强制修改端口与账户密码"
+    read -rp "请设置登录用户名 [默认随机用户名]: " config_account
+    [[ -z $config_account ]] && config_account=$(date +%s%N | md5sum | cut -c 1-8)
+    read -rp "请设置登录密码 [默认随机密码]: " config_password
+    [[ -z $config_password ]] && config_password=$(date +%s%N | md5sum | cut -c 1-8)
+    read -rp "请设置面板访问端口 [默认随机端口]: " config_port
+    [[ -z $config_port ]] && config_port=$(shuf -i 1000-65535 -n 1)
+    until [[ -z $(ss -ntlp | awk '{print $4}' | grep -w "$config_port") ]]; do
+        if [[ -n $(ss -ntlp | awk '{print $4}' | grep -w  "$config_port") ]]; then
+            yellow "你设置的端口目前已被其他程序占用，请重新设置端口"
+            read -rp "请设置面板访问端口 [默认随机端口]: " config_port
+            [[ -z $config_port ]] && config_port=$(shuf -i 1000-65535 -n 1)
+        fi
+    done
+    /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password} >/dev/null 2>&1
+    /usr/local/x-ui/x-ui setting -port ${config_port} >/dev/null 2>&1
+}
+
+install_xui() {
+    info_bar
+    
+    if [[ -e /usr/local/x-ui/ ]]; then
+        yellow "检测到目前已安装x-ui面板, 确认卸载原x-ui面板?"
+        read -rp "请输入选项 [Y/N, 默认N]: " yn
+        if [[ $yn =~ "Y"|"y" ]]; then
+            systemctl stop x-ui
+            systemctl disable x-ui
+            rm /etc/systemd/system/x-ui.service -f
+            systemctl daemon-reload
+            systemctl reset-failed
+            rm /etc/x-ui/ -rf
+            rm /usr/local/x-ui/ -rf
+            rm /usr/bin/x-ui -f
+        else
+            red "已取消卸载, 脚本退出!"
+            exit 1
+        fi
+    fi
+    
+    systemctl stop x-ui >/dev/null 2>&1
+    
+    install_base
+    download_xui $1
+    panel_config
+    
+    systemctl daemon-reload
+    systemctl enable x-ui >/dev/null 2>&1
+    systemctl start x-ui
+    
+    cd $cur_dir
+    rm -f install.sh
+    green "x-ui v${last_version} 安装完成，面板已启动"
+    echo -e ""
+    echo -e "x-ui 管理脚本使用方法: "
+    echo -e "----------------------------------------------"
+    echo -e "x-ui              - 显示管理菜单 (功能更多)"
+    echo -e "x-ui start        - 启动 x-ui 面板"
+    echo -e "x-ui stop         - 停止 x-ui 面板"
+    echo -e "x-ui restart      - 重启 x-ui 面板"
+    echo -e "x-ui status       - 查看 x-ui 状态"
+    echo -e "x-ui enable       - 设置 x-ui 开机自启"
+    echo -e "x-ui disable      - 取消 x-ui 开机自启"
+    echo -e "x-ui log          - 查看 x-ui 日志"
+    echo -e "x-ui v2-ui        - 迁移本机器的 v2-ui 账号数据至 x-ui"
+    echo -e "x-ui update       - 更新 x-ui 面板"
+    echo -e "x-ui install      - 安装 x-ui 面板"
+    echo -e "x-ui uninstall    - 卸载 x-ui 面板"
+    echo -e "----------------------------------------------"
+    echo -e ""
+    show_login_info
+    echo -e ""
+    yellow "如无法访问x-ui面板，请先在SSH命令行输入x-ui命令，再选择17选项放开防火墙端口"
+}
+
+show_login_info(){
+    if [[ -n $v4 && -z $v6 ]]; then
+        echo -e "面板IPv4登录地址为: ${GREEN}http://$v4:$config_port ${PLAIN}"
+    elif [[ -n $v6 && -z $v4 ]]; then
+        echo -e "面板IPv6登录地址为: ${GREEN}http://[$v6]:$config_port ${PLAIN}"
+    elif [[ -n $v4 && -n $v6 ]]; then
+        echo -e "面板IPv4登录地址为: ${GREEN}http://$v4:$config_port ${PLAIN}"
+        echo -e "面板IPv6登录地址为: ${GREEN}http://[$v6]:$config_port ${PLAIN}"
+    fi
+    echo -e "用户名: ${GREEN}$config_account ${PLAIN}"
+    echo -e "密码: ${GREEN}$config_password ${PLAIN}"
+}
+
+install_xui $1

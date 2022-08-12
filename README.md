@@ -1,105 +1,64 @@
-<h1 align="center">X-UI Unofficial.</h1>
+# X-UI
 
-> Đây Là Phiên Bản X-UI được Việt Hoá và cập nhật Xray định kỳ. kèm các bản vá Pull.
+支持多协议多用户的 xray 面版、支持Telegram Bot提醒和预警
 
-# Đọc kỹ rồi làm gì hẳng làm. Làm ơn. Install Lộn Script Không Được Ráng Chịu.
+## 安装命令
 
-## Support Platform
-Linux:
+> 可直接将面板原版升级至本优化版
+
+```shell
+wget -N --no-check-certificate https://raw.githubusercontent.com/taffychan/x-ui/main/install.sh && bash install.sh
 ```
-Debian
-Ubuntu
-CentOS
-RaspberryPI OS
-Armbian
+
+> 如提示 `wget: command not found` 请安装wget后再执行本脚本
+
+> CentOS: `yum install -y wget` Debian / Ubuntu: `apt install -y wget`
+
+## 建议系统
+
+* CentOS 7+
+* Fedora 29+
+* Ubuntu 16+
+* Debian 9+
+* Alpine （未测试）
+
+## 功能介绍
+
+* 系统状态监控
+* 支持多用户多协议，网页可视化操作
+* 支持的节点传输协议：vmess、vless、trojan、shadowsocks、shadowsocks 2022、dokodemo-door、socks、http
+* 支持配置更多传输配置
+* 流量统计，限制流量，限制到期时间
+* 可自定义 xray 配置模板
+* 支持 https 访问面板（请自行准备域名 + ssl 证书）
+* 支持 纯IPv4、纯IPv6及原生双栈 IP环境的VPS
+* 支持 amd64、arm64、s390x CPU架构的VPS
+* 支持 Telegram Bot 提醒面板，SSH登录信息、流量使用情况
+
+## TG机器人使用
+
+x-ui面板支持通过TG机器人实现每日流量通知，面板登录提醒以及cmd控制等功能。
+
+通知内容：节点流量使用、面板登录提醒、节点到期提醒和流量预警提醒
+
+机器人命令列表：
+
 ```
-Arch:
+/help 获取bot的帮助信息
+/delete [port] 删除对应端口的节点
+/restart 重启xray服务
+/status 获取当前系统状态
+/enable [port] 开启对应端口的节点
+/disable [port] 关闭对应端口的节点
+/clear [port] 清理对应端口的节点流量
+/clearall 清理所有节点流量
+/version [version] 将会升级xray内核到 [version] 版本
 ```
-386
-amd64
-arm
-arm64
-mips
-mips64
-mips64le - Drop
-mipsle - Drop
-riscv64
-s390x
-```
-## Cài Đặt Bằng Tay
-- Đọc kỹ rồi làm gì hẳng làm
-```
-# Thay đổi theo danh sách Arch phía trên, Cho đúng thiết bị của bạn.
-export UARCH="arm64"
-```
-- Tải bản X-UI theo Cấu trúc CPU bạn dùng tại đây [Release](https://github.com/dopaemon/x-ui/releases)
-```
-sudo -s
-```
-```
-rm x-ui/ /usr/local/x-ui/ /usr/bin/x-ui -rf
-```
-```
-tar zxvf x-ui-linux-$UARCH.tar.gz
-```
-```
-chmod +x x-ui/x-ui x-ui/bin/xray-linux-* x-ui/x-ui.sh
-```
-```
-cp x-ui/x-ui.sh /usr/bin/x-ui
-```
-```
-cp -f x-ui/x-ui.service /etc/systemd/system/
-```
-```
-mv x-ui/ /usr/local/
-```
-```
-systemctl daemon-reload
-```
-```
-systemctl enable x-ui
-```
-```
-systemctl restart x-ui
-```
-```
-Tài khoản mặc định:
-- TK: admin
-- PW: admin
-- PR: 54321
-```
-## Cài Đặt Bằng Script [ Đọc lưu ý phía dưới ]
-## Chỉ Support: amd64, arm64, s390x, riscv64.
-```
-Tắt Unikey trước khi chạy Script. Tránh trình trạng Sai Mật Khẩu
-```
-## Theme Sofbox [ Stable ]
-[Demo Theme](https://dopaemon.github.io/-Sofbox-Admin-Template/index.html)
-```
-sudo -s
-```
-```
-bash <(curl -Ls https://raw.githubusercontent.com/dopaemon/x-ui/main/install.sh)
-```
-## Theme SBAdmin 2 [ Stable ]
-[Demo Theme](https://startbootstrap.github.io/startbootstrap-sb-admin-2/)
-- Nếu bạn có 1 bản Linux đã cũ: GLIBC_2.28 not found
-```
-sudo -s
-```
-```
-bash <(curl -Ls https://raw.githubusercontent.com/dopaemon/x-ui/main/install.sh) 0.3.4.4-SBAdmin
-```
-## Cài đặt bản Latest [ Có thể không ổn định ]
-```
-sudo -s
-```
-```
-bash <(curl -Ls https://raw.githubusercontent.com/dopaemon/x-ui/main/install.sh) Dev
-```
-## ⚠️⚠️⚠️ Làm ơn không dùng cách này để install x-ui
-```
-sudo bash <(curl -Ls https://raw.githubusercontent.com/dopaemon/x-ui/main/install.sh)
-```
-## Owner: Dự án gốc nằm ở đây [**vaxilu**](https://github.com/vaxilu/x-ui) - Tôi chỉ phát triển nó cho người Việt Nam dễ tiếp cận hơn.
+
+### 准备材料
+
+* TG机器人TOKEN
+* TG机器人ChatId
+* 机器人周期运行时间，采用crontab语法，语法说明如下
+
+> Crontab表达式生成器：https://cron.qqe2.com/
